@@ -1,33 +1,8 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame,moderngl,sys,math,numpy,json
-from PIL import Image
 from renderer import *
-class audioengine:
-    def __init__(self,volume):
-        pygame.mixer.pre_init(frequency=44100, size=16,buffer=8192)
-        pygame.init()
-        pygame.mixer.set_num_channels(32)
-        self.volume = volume
-    def play_sound_3d(self, file, position, listener_position):
-        default_output = pygame.mixer.get_init()[1]
-        if default_output in (None, 'built-in'):
-            sound = pygame.mixer.Sound(file)
-            dx = listener_position[0] - position[0]
-            dy = listener_position[1] - position[1]
-            distance = math.sqrt(dx**2 + dy**2)
-            max_distance = 500.0
-            attenuation = max(1.0 - distance / max_distance, 0.0)
-            pan = dx / max_distance
-            channel = sound.play()
-            channel.set_volume(attenuation * (1 - pan) + self.volume, (attenuation * pan)+ self.volume)
-        else:
-            sound = pygame.mixer.Sound(file)
-            sound.set_volume(self.volume)
-            sound.play()
-    def cleanup(self):
-        pygame.mixer.stop()
-        pygame.mixer.quit()
+
 class window:
     def __init__(self):
         print(f"OpenGL 3.3\nModernGL {moderngl.__version__}")
@@ -35,21 +10,22 @@ class window:
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
+        init_settings = json.loads(self.read_file("settings.json"))
+        self.audio = audioengine(init_settings["settings"]["volume"])
         self.screen = pygame.display.set_mode((0,0),pygame.OPENGL|pygame.DOUBLEBUF|pygame.FULLSCREEN)
-        self.game_name = "Sniper Rifle"
-        self.fov = 120
-        self.audio = audioengine()
+        self.game_name = init_settings["settings"]["game_name"]
+        self.fov = init_settings["settings"]["fov"]
         self.camera = camera(self.fov)
         self.light = light()
         #pygame.display.set_icon(pygame.image.load('game_logo.png'))
         pygame.display.set_caption(self.game_name)
         self.ctx = moderngl.create_context(require=330)
         self.ctx.enable(moderngl.DEPTH_TEST|moderngl.CULL_FACE|moderngl.BLEND)
-        self.fps = 1000
+        self.fps = init_settings["settings"]["fps"]
         self.clock = pygame.time.Clock()
-        self.volume = 100
+        self.volume = init_settings["settings"]["volume"]
         self.scene = Triangle(self,numpy.array([(-0.6,-0.8,0.0),(0.6,-0.8,0.0),(0.0,0.8,0.0)],dtype="f4"))
-        self.dt = 1
+        self.dt = 0
     def run(self):
         while 1:
             self.update()
@@ -76,4 +52,31 @@ class window:
         right = [k for k in list if k > pivot]
         return self.sort(left)+middle+self.sort(right)
     def read_file(self,file):
-        pass
+       with open(file) as f:
+           return f.read()
+
+class audioengine:
+    def __init__(self,volume):
+        pygame.mixer.pre_init(frequency=44100, size=16,buffer=8192)
+        pygame.init()
+        pygame.mixer.set_num_channels(32)
+        self.volume = volume
+    def play_sound_3d(self, file, position, listener_position):
+        default_output = pygame.mixer.get_init()[1]
+        if default_output in (None, 'built-in'):
+            sound = pygame.mixer.Sound(file)
+            dx = listener_position[0] - position[0]
+            dy = listener_position[1] - position[1]
+            distance = math.sqrt(dx**2 + dy**2)
+            max_distance = 500.0
+            attenuation = max(1.0 - distance / max_distance, 0.0)
+            pan = dx / max_distance
+            channel = sound.play()
+            channel.set_volume(attenuation * (1 - pan) + self.volume, (attenuation * pan)+ self.volume)
+        else:
+            sound = pygame.mixer.Sound(file)
+            sound.set_volume(self.volume)
+            sound.play()
+    def cleanup(self):
+        pygame.mixer.stop()
+        pygame.mixer.quit()
