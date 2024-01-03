@@ -1,14 +1,14 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-import pygame,moderngl,sys,math,numpy
+import pygame,moderngl,sys,math,numpy,json
 from PIL import Image
 from renderer import *
 class audioengine:
-    def __init__(self):
+    def __init__(self,volume):
         pygame.mixer.pre_init(frequency=44100, size=16,buffer=8192)
         pygame.init()
         pygame.mixer.set_num_channels(32)
-        self.volume = 100
+        self.volume = volume
     def play_sound_3d(self, file, position, listener_position):
         default_output = pygame.mixer.get_init()[1]
         if default_output in (None, 'built-in'):
@@ -20,7 +20,7 @@ class audioengine:
             attenuation = max(1.0 - distance / max_distance, 0.0)
             pan = dx / max_distance
             channel = sound.play()
-            channel.set_volume(attenuation * (1 - pan), attenuation * pan)
+            channel.set_volume(attenuation * (1 - pan) + self.volume, (attenuation * pan)+ self.volume)
         else:
             sound = pygame.mixer.Sound(file)
             sound.set_volume(self.volume)
