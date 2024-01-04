@@ -1,1 +1,15 @@
-{"settings":{"volume": 100,"fullscreen": "True","mouse_sensitivity": 0,"fov": 120,"game_name": "Game","fps": 0}}
+{
+    "settings":
+    {
+        "volume": 100,
+        "fullscreen": "True",
+        "mouse_sensitivity": 0,
+        "fov": 120,
+        "game_name": "Game",
+        "fps": 0
+    },
+    "game_info":
+    {
+        "hold": "string"
+    }
+}
