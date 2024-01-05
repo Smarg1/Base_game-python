@@ -1,6 +1,6 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-import pygame,moderngl,sys,math,numpy,json
+import pygame,moderngl,sys,math,numpy
 from renderer import *
 
 class window:
@@ -10,7 +10,7 @@ class window:
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
-        init_settings = json.loads(self.read_file("settings.json"))
+        init_settings = dict(self.read_file("settings.json"))
         self.audio = audioengine(init_settings["settings"]["volume"])
         self.screen = pygame.display.set_mode((0,0),pygame.OPENGL|pygame.DOUBLEBUF|pygame.FULLSCREEN)
         self.game_name = init_settings["settings"]["game_name"]
