@@ -1,6 +1,6 @@
 import os
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-import pygame,moderngl,sys,math,numpy
+import pygame,moderngl,sys,math,numpy,json
 from renderer import *
 
 class window:
@@ -10,20 +10,20 @@ class window:
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
-        init_settings = dict(self.read_file("settings.json"))
-        self.audio = audioengine(init_settings["settings"]["volume"])
+        self.init_settings = self.read_file("settings.json")
+        self.audio = audioengine(self.init_settings["settings"]["volume"])
         self.screen = pygame.display.set_mode((0,0),pygame.OPENGL|pygame.DOUBLEBUF|pygame.FULLSCREEN)
-        self.game_name = init_settings["settings"]["game_name"]
-        self.fov = init_settings["settings"]["fov"]
+        self.game_name = self.init_settings["settings"]["game_name"]
+        self.fov = self.init_settings["settings"]["fov"]
         self.camera = camera(self.fov)
         self.light = light()
         #pygame.display.set_icon(pygame.image.load('game_logo.png'))
         pygame.display.set_caption(self.game_name)
         self.ctx = moderngl.create_context(require=330)
         self.ctx.enable(moderngl.DEPTH_TEST|moderngl.CULL_FACE|moderngl.BLEND)
-        self.fps = init_settings["settings"]["fps"]
+        self.fps = self.init_settings["settings"]["fps"]
         self.clock = pygame.time.Clock()
-        self.volume = init_settings["settings"]["volume"]
+        self.volume = self.init_settings["settings"]["volume"]
         self.scene = Triangle(self,numpy.array([(-0.6,-0.8,0.0),(0.6,-0.8,0.0),(0.0,0.8,0.0)],dtype="f4"))
         self.dt = 0
     def run(self):
@@ -31,6 +31,7 @@ class window:
             self.update()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    self.save_settings("settings.json")
                     self.audio.cleanup()
                     self.scene.destroy()
                     pygame.quit()
@@ -52,8 +53,11 @@ class window:
         right = [k for k in list if k > pivot]
         return self.sort(left)+middle+self.sort(right)
     def read_file(self,file):
-       with open(file) as f:
-           return f.read()
+       with open(file,"r") as f:
+           return json.load(f)
+    def save_settings(self,file):
+        with open(file,"w") as f:
+            json.dump(self.init_settings, f)
 
 class audioengine:
     def __init__(self,volume):
