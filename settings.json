@@ -1,6 +1,5 @@
 {
-    "settings":
-    {
+    "settings": {
         "volume": 100,
         "fullscreen": "True",
         "mouse_sensitivity": 0,
@@ -8,8 +7,7 @@
         "game_name": "Game",
         "fps": 0
     },
-    "game_info":
-    {
+    "game_info": {
         "hold": "string"
     }
 }

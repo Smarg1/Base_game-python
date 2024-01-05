@@ -57,7 +57,7 @@ class window:
            return json.load(f)
     def save_settings(self,file):
         with open(file,"w") as f:
-            json.dump(self.init_settings, f)
+            json.dump(self.init_settings, f, indent=4)
 
 class audioengine:
     def __init__(self,volume):
