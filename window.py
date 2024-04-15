@@ -24,7 +24,7 @@ class window:
         self.fps = self.init_settings["settings"]["fps"]
         self.clock = pygame.time.Clock()
         self.volume = self.init_settings["settings"]["volume"]
-        self.scene = Triangle(self,numpy.array([(-0.6,-0.8,0.0),(0.6,-0.8,0.0),(0.0,0.8,0.0)],dtype="f4"))
+        self.scene = Cube(self,numpy.array([(-0.6,-0.8,0.0),(0.6,-0.8,0.0),(0.0,0.8,0.0)],dtype="f4"))
         self.dt = 0
     def run(self):
         while 1:
