@@ -27,6 +27,7 @@ class window:
             self.camera = camera(self.fov)
             self.light = light()
             pygame.display.set_caption(self.game_name)
+            pygame.display.set_icon(pygame.image.load('game-icon.png'))
             self.ctx = moderngl.create_context(require=330)
             self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE | moderngl.BLEND)
             self.fps = self.init_settings["settings"]["fps"]
@@ -36,8 +37,8 @@ class window:
             self.dt = 0
             print("COMPLETE")
             print(f"\nPython {sys.version.strip()}\n{platform.platform(terse=True)} {platform.architecture()[0]}")
-            print(f"OpenGL {self.ctx.version_code}\nModernGL {moderngl.__version__}\nPygame {pygame.__version__}\nSDL {pygame.SDL.major}.{pygame.SDL.minor}.{pygame.SDL.patch}")
-        except SystemError or OSError as e:
+            print(f"OpenGL {self.ctx.version_code}\nModernGL {moderngl.__version__}\nPygame {pygame.__version__}\nSDL {'.'.join(str(x) for x in pygame.get_sdl_version())}")
+        except (SystemError, OSError) as e:
             print(e)
             sys.exit("\nExit Code: \n1")
 
