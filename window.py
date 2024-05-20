@@ -1,35 +1,45 @@
 import os
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-import pygame
+import platform
 import moderngl
 import sys
 import math
 import numpy
 import json
 from renderer import *
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+import pygame
 
 class window:
     def __init__(self):
-        print(f"OpenGL 3.3\nModernGL {moderngl.__version__}")
-        pygame.init()
-        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
-        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
-        pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
-        self.init_settings = self.read_file("settings.json")
-        self.audio = audioengine(self.init_settings["settings"]["volume"])
-        self.screen = pygame.display.set_mode((0, 0), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN)
-        self.game_name = self.init_settings["settings"]["game_name"]
-        self.fov = self.init_settings["settings"]["fov"]
-        self.camera = camera(self.fov)
-        self.light = light()
-        pygame.display.set_caption(self.game_name)
-        self.ctx = moderngl.create_context(require=330)
-        self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE | moderngl.BLEND)
-        self.fps = self.init_settings["settings"]["fps"]
-        self.clock = pygame.time.Clock()
-        self.volume = self.init_settings["settings"]["volume"]
-        self.scene = Cube(self, numpy.array([(-0.6, -0.8, 0.0), (0.6, -0.8, 0.0), (0.0, 0.8, 0.0)], dtype="f4"))
-        self.dt = 0
+        try:
+            print("Loading... Initializing")
+            pygame.init()
+            print("Loading... Getting Settings")
+            pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
+            pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
+            pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
+            self.init_settings = self.read_file("settings.json")
+            self.audio = audioengine(self.init_settings["settings"]["volume"])
+            self.screen = pygame.display.set_mode((0, 0), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN)
+            self.game_name = self.init_settings["settings"]["game_name"]
+            self.fov = self.init_settings["settings"]["fov"]
+            print("Loading... Setting up")
+            self.camera = camera(self.fov)
+            self.light = light()
+            pygame.display.set_caption(self.game_name)
+            self.ctx = moderngl.create_context(require=330)
+            self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE | moderngl.BLEND)
+            self.fps = self.init_settings["settings"]["fps"]
+            self.clock = pygame.time.Clock()
+            self.volume = self.init_settings["settings"]["volume"]
+            self.scene = Cube(self, numpy.array([(-0.6, -0.8, 0.0), (0.6, -0.8, 0.0), (0.0, 0.8, 0.0)], dtype="f4"))
+            self.dt = 0
+            print("COMPLETE")
+            print(f"\nPython {sys.version.strip()}\n{platform.platform(terse=True)} {platform.architecture()[0]}")
+            print(f"OpenGL {self.ctx.version_code}\nModernGL {moderngl.__version__}\nPygame {pygame.__version__}\nSDL {pygame.SDL.major}.{pygame.SDL.minor}.{pygame.SDL.patch}")
+        except SystemError or OSError as e:
+            print(e)
+            sys.exit("\nExit Code: \n1")
 
     def run(self):
         while True:
@@ -40,8 +50,8 @@ class window:
                     self.audio.cleanup()
                     self.scene.destroy()
                     pygame.quit()
-                    sys.exit()
-
+                    sys.exit("\nExit Code: \n0")
+                    
     def update(self):
         self.lastime = self.clock.get_time()
         self.ctx.clear(color=(0.3, 0.7, 0.8))
