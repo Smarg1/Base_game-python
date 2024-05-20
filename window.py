@@ -28,7 +28,7 @@ class window:
             self.light = light()
             self.game_icon = self.init_settings["settings"]["game-icon"]
             pygame.display.set_caption(self.game_name)
-            pygame.display.set_icon(pygame.image.load())
+            pygame.display.set_icon(pygame.image.load(self.game_icon))
             self.ctx = moderngl.create_context(require=330)
             self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE | moderngl.BLEND)
             self.fps = self.init_settings["settings"]["fps"]
