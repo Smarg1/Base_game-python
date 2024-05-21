@@ -15,20 +15,27 @@ class window:
             print("Loading... Initializing")
             pygame.init()
             print("Loading... Getting Settings")
+
             pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
             pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
             pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
+
             self.init_settings = self.read_file("settings.json")
             self.audio = audioengine(self.init_settings["settings"]["volume"])
-            self.screen = pygame.display.set_mode((0, 0), pygame.OPENGL | pygame.DOUBLEBUF | pygame.FULLSCREEN)
+            self.screen = pygame.display.set_mode((0, 0), pygame.OPENGLBLIT | pygame.DOUBLEBUF | pygame.FULLSCREEN)
             self.game_name = self.init_settings["settings"]["game_name"]
             self.fov = self.init_settings["settings"]["fov"]
+
             print("Loading... Setting up")
             self.camera = camera(self.fov)
             self.light = light()
             self.game_icon = self.init_settings["settings"]["game-icon"]
+
             pygame.display.set_caption(self.game_name)
-            pygame.display.set_icon(pygame.image.load(self.game_icon))
+            if self.game_icon:
+                pygame.display.set_icon(pygame.image.load(self.game_icon))
+            else:
+                pygame.display.set_icon(pygame.image.load("game-icon.png"))
             self.ctx = moderngl.create_context(require=330)
             self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE | moderngl.BLEND)
             self.fps = self.init_settings["settings"]["fps"]
@@ -36,16 +43,24 @@ class window:
             self.volume = self.init_settings["settings"]["volume"]
             self.scene = Cube(self, numpy.array([(-0.6, -0.8, 0.0), (0.6, -0.8, 0.0), (0.0, 0.8, 0.0)], dtype="f4"))
             self.dt = 0
+
             print("COMPLETE")
-            print(f"\nPython {sys.version.strip()}\n{platform.platform(terse=True)} {platform.architecture()[0]}")
+            print(f"\nPython {sys.version.strip()}{platform.architecture()[0]}\n{platform.platform(terse=True)} {platform.architecture()[0]}")
             print(f"OpenGL {self.ctx.version_code}\nModernGL {moderngl.__version__}\nPygame {pygame.__version__}\nSDL {'.'.join(str(x) for x in pygame.get_sdl_version())}")
-        except (SystemError, OSError) as e:
+            print(f"GPU Vendor: {self.ctx.info['GL_VENDOR']}")
+            print(f"GPU: {self.ctx.info['GL_RENDERER']}")
+            print(f"GL DRIVER: {self.ctx.info['GL_VERSION']}\n")
+
+        except (SystemError, OSError, RuntimeError, ChildProcessError) as e:
             print(e)
             sys.exit("\nExit Code: \n1")
 
     def run(self):
-        while True:
-            self.update()
+        focus = None
+
+        while 1:
+            self.update(focus)  
+            self.event_handler()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.save_settings("settings.json")
@@ -53,15 +68,30 @@ class window:
                     self.scene.destroy()
                     pygame.quit()
                     sys.exit("\nExit Code: \n0")
+                elif event.type == pygame.WINDOWLEAVE:
+                    print("Energy Saver: True")
+                    focus = False
+                elif event.type == pygame.WINDOWENTER:
+                    print("Energy Saver: False")
+                    focus = True
                     
-    def update(self):
-        self.lastime = self.clock.get_time()
-        self.ctx.clear(color=(0.3, 0.7, 0.8))
-        self.scene.render()
-        self.clock.tick(self.fps)
-        pygame.display.flip()
-        self.lastime = self.clock.get_time()
-        self.dt = (self.clock.get_time() - self.lastime) + 1
+    def event_handler(self):
+        key_up = pygame.key.get_just_released()
+        key_down = pygame.key.get_just_pressed()
+        if key_up[pygame.K_0]:
+            print(f"\nDebug\nFPS: {self.fps}\n")
+
+    def update(self,state):
+        if state:
+            self.lastime = self.clock.get_time()
+            self.ctx.clear(color=(0.3, 0.7, 0.8))
+            self.scene.render()
+            self.clock.tick(self.fps)
+            pygame.display.flip()
+            self.lastime = self.clock.get_time()
+            self.dt = (self.clock.get_time() - self.lastime) + 1
+        else:
+            pygame.time.wait(100)
 
     def sort(self, list):
         if len(list) <= 1:

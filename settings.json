@@ -5,8 +5,8 @@
         "mouse_sensitivity": 0,
         "fov": 120,
         "game_name": "EuEngine2",
-        "game-icon": "game-icon.png",
-        "fps": 0
+        "game-icon": "",
+        "fps": 60
     },
     "game_info": {
         "hold": "string"
