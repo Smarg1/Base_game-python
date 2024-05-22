@@ -1,47 +1,58 @@
 import os
 import platform
-import moderngl
+import moderngl,glm
 import sys
 import math
 import numpy
 import json
+import numba
 from Models import *
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 
 class window:
+    VERSION = "1.0.0"
+    MIN_SIZE = (500, 500)
     def __init__(self):
         try:
             print("Loading... Initializing")
             pygame.init()
             print("Loading... Getting Settings")
+            if pygame.display.Info().current_h < self.MIN_SIZE[1] or pygame.display.Info().current_w < self.MIN_SIZE[0]:
+                raise RuntimeError()
 
             pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
             pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
             pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
 
-            self.init_settings = self.read_file("settings.json")
+            pygame.event.set_grab(True)
+            pygame.mouse.set_visible(False)
+            self.init_settings = self.read_file("asset/settings.json")
             self.audio = audioengine(self.init_settings["settings"]["volume"])
-            self.screen = pygame.display.set_mode((0, 0), pygame.OPENGLBLIT | pygame.DOUBLEBUF | pygame.FULLSCREEN)
+            self.screen = pygame.display.set_mode(self.MIN_SIZE, pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE)
             self.game_name = self.init_settings["settings"]["game_name"]
             self.fov = self.init_settings["settings"]["fov"]
-
+            
             print("Loading... Setting up")
-            self.camera = camera(self.fov)
-            self.light = light()
+            self.camera = Camera(self.fov,self)
+            self.light = Light()
+            
             self.game_icon = self.init_settings["settings"]["game-icon"]
 
             pygame.display.set_caption(self.game_name)
             if self.game_icon:
                 pygame.display.set_icon(pygame.image.load(self.game_icon))
             else:
-                pygame.display.set_icon(pygame.image.load("game-icon.png"))
+                pygame.display.set_icon(pygame.image.load("asset/game-icon.png"))
             self.ctx = moderngl.create_context(require=330)
             self.ctx.enable(moderngl.DEPTH_TEST | moderngl.CULL_FACE | moderngl.BLEND)
+            self.ctx.front_face = 'cw'
             self.fps = self.init_settings["settings"]["fps"]
             self.clock = pygame.time.Clock()
             self.volume = self.init_settings["settings"]["volume"]
-            self.scene = Cube(self, numpy.array([(-0.6, -0.8, 0.0), (0.6, -0.8, 0.0), (0.0, 0.8, 0.0)], dtype="f4"))
+            self.mesh = Mesh(self)
+            self.scene = Scene(self)
+            self.scene_renderer = SceneRenderer(self)
             self.dt = 0
 
             print("COMPLETE")
@@ -49,43 +60,64 @@ class window:
             print(f"OpenGL {self.ctx.version_code}\nModernGL {moderngl.__version__}\nPygame {pygame.__version__}\nSDL {'.'.join(str(x) for x in pygame.get_sdl_version())}")
             print(f"GPU Vendor: {self.ctx.info['GL_VENDOR']}")
             print(f"GPU: {self.ctx.info['GL_RENDERER']}")
-            print(f"GL DRIVER: {self.ctx.info['GL_VERSION']}\n")
+            print(f"GL DRIVER: {self.ctx.info['GL_VERSION']}\nEngine Version: {self.VERSION}")
 
         except (SystemError, OSError, RuntimeError, ChildProcessError) as e:
             print(e)
-            sys.exit("\nExit Code: \n1")
+            sys.exit("\nExit Code: \n1\n")
 
+    numba.njit()
     def run(self):
         focus = None
-
+        self.update(focus)  
         while 1:
-            self.update(focus)  
-            self.event_handler()
+            self.update(focus) 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.save_settings("settings.json")
                     self.audio.cleanup()
-                    self.scene.destroy()
+                    self.mesh.destroy()
+                    self.scene_renderer.destroy()
                     pygame.quit()
-                    sys.exit("\nExit Code: \n0")
-                elif event.type == pygame.WINDOWLEAVE:
+                    sys.exit("\nExit Code: \n0\n")
+                elif event.type == pygame.WINDOWFOCUSLOST:
                     print("Energy Saver: True")
                     focus = False
-                elif event.type == pygame.WINDOWENTER:
+                elif event.type == pygame.WINDOWFOCUSGAINED:
                     print("Energy Saver: False")
                     focus = True
-                    
+                elif event.type == pygame.VIDEORESIZE:
+                    self.resize(True,event)
+
+    numba.njit()            
     def event_handler(self):
         key_up = pygame.key.get_just_released()
         key_down = pygame.key.get_just_pressed()
         if key_up[pygame.K_0]:
-            print(f"\nDebug\nFPS: {math.ceil(pygame.time.Clock.get_fps(self.clock))}\n")
+            print(f"\nDebug\nFPS: {math.ceil(pygame.time.Clock.get_fps(self.clock))}\nRefresh Rate: {pygame.display.get_current_refresh_rate}")
+        if key_up[pygame.K_ESCAPE]:
+            self.resize(False)
+            
 
+    def resize(self,check,event):
+        if check:
+            h = event.h
+            w = event.w
+            if w < self.MIN_SIZE[0]:
+                w = self.MIN_SIZE[0]
+            if h < self.MIN_SIZE[1]:
+                h = self.MIN_SIZE[1]
+            self.screen = pygame.display.set_mode((w,h), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE)
+        else:
+            pygame.display.toggle_fullscreen()
+    numba.njit()
     def update(self,state):
         if state:
+            self.event_handler()
+            self.camera.update()
             self.lastime = self.clock.get_time()
-            self.ctx.clear(color=(0.3, 0.7, 0.8))
-            self.scene.render()
+            self.ctx.clear(color=(0.08, 0.16, 0.18))
+            self.scene.update()
             self.clock.tick(self.fps)
             pygame.display.flip()
             self.lastime = self.clock.get_time()
@@ -137,3 +169,68 @@ class audioengine:
     def cleanup(self):
         pygame.mixer.stop()
         pygame.mixer.quit()
+
+class Camera:
+    NEAR = 0.1
+    FAR = 100
+    SPEED = 0.005
+    SENSITIVITY = 0.04
+    def __init__(self, fov, app, position=(0, 0, 4), yaw=-90, pitch=0):
+        self.fov = fov
+        self.app = app
+        self.aspect_ratio = 16/9
+        self.position = glm.vec3(position)
+        self.up = glm.vec3(0, 1, 0)
+        self.right = glm.vec3(1, 0, 0)
+        self.forward = glm.vec3(0, 0, -1)
+        self.yaw = yaw
+        self.pitch = pitch
+        self.m_view = self.get_view_matrix()
+        self.m_proj = self.get_projection_matrix()
+
+    def rotate(self):
+        if pygame.mouse.get_pressed()[2]:
+            rel_x, rel_y = pygame.mouse.get_rel()
+            self.yaw += rel_x * self.SENSITIVITY
+            self.pitch -= rel_y * self.SENSITIVITY
+            self.pitch = max(-89, min(89, self.pitch))
+
+    def update_camera_vectors(self):
+        yaw, pitch = glm.radians(self.yaw), glm.radians(self.pitch)
+
+        self.forward.x = glm.cos(yaw) * glm.cos(pitch)
+        self.forward.y = glm.sin(pitch)
+        self.forward.z = glm.sin(yaw) * glm.cos(pitch)
+
+        self.forward = glm.normalize(self.forward)
+        self.right = glm.normalize(glm.cross(self.forward, glm.vec3(0, 1, 0)))
+        self.up = glm.normalize(glm.cross(self.right, self.forward))
+
+    def update(self):
+        self.move()
+        self.rotate()
+        self.update_camera_vectors()
+        self.m_view = self.get_view_matrix()
+
+    def move(self):
+        velocity = self.SPEED * self.app.dt
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_w]:
+            self.position += self.forward * velocity
+        if keys[pygame.K_s]:
+            self.position -= self.forward * velocity
+        if keys[pygame.K_a]:
+            self.position -= self.right * velocity
+        if keys[pygame.K_d]:
+            self.position += self.right * velocity
+        if keys[pygame.K_q]:
+            self.position += self.up * velocity
+        if keys[pygame.K_e]:
+            self.position -= self.up * velocity
+
+    def get_view_matrix(self):
+        return glm.lookAt(self.position, self.position + self.forward, self.up)
+
+    def get_projection_matrix(self):
+        return glm.perspective(glm.radians(self.fov), self.aspect_ratio, self.NEAR, self.FAR)
+
