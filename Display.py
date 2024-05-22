@@ -5,7 +5,7 @@ import sys
 import math
 import numpy
 import json
-from renderer import *
+from Models import *
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 

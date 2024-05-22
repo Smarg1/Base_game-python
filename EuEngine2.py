@@ -1,4 +1,4 @@
-from window import *
+from Display import *
 from threading import Thread
 
 def audio_management():
