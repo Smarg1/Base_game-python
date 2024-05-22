@@ -6,7 +6,7 @@
         "fov": 120,
         "game_name": "EuEngine2",
         "game-icon": "",
-        "fps": 60
+        "fps": 0
     },
     "game_info": {
         "hold": "string"

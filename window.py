@@ -79,7 +79,7 @@ class window:
         key_up = pygame.key.get_just_released()
         key_down = pygame.key.get_just_pressed()
         if key_up[pygame.K_0]:
-            print(f"\nDebug\nFPS: {self.fps}\n")
+            print(f"\nDebug\nFPS: {math.ceil(pygame.time.Clock.get_fps(self.clock))}\n")
 
     def update(self,state):
         if state:
