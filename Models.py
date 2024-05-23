@@ -3,6 +3,7 @@ import numpy as np
 import glm
 import pygame as pg
 
+#Models
 class BaseModel:
     def __init__(self, app, vao_name, tex_id, pos=(0, 0, 0), rot=(0, 0, 0), scale=(1, 1, 1)):
         self.app = app
@@ -130,7 +131,17 @@ class AdvancedSkyBox(BaseModel):
         self.texture = self.app.mesh.texture.textures[self.tex_id]
         self.program['u_texture_skybox'] = 0
         self.texture.use(location=0)
+class Mesh:
+    def __init__(self, app):
+        self.app = app
+        self.vao = VAO(app.ctx)
+        self.texture = Texture(app)
 
+    def destroy(self):
+        self.vao.destroy()
+        self.texture.destroy()
+
+#scene
 class SceneRenderer:
     def __init__(self, app):
         self.app = app
@@ -169,15 +180,123 @@ class Light:
         self.color = glm.vec3(color)
         self.direction = glm.vec3(0, 0, 0)
         # intensities
-        self.Ia = 0.06 * self.color  # ambient
-        self.Id = 0.8 * self.color  # diffuse
-        self.Is = 1.0 * self.color  # specular
+        self.Ia = 0.08 * self.color  # ambient
+        self.Id = 1.0 * self.color  # diffuse
+        self.Is = 0.1 * self.color  # specular
         # view matrix
         self.m_view_light = self.get_view_matrix()
 
     def get_view_matrix(self):
         return glm.lookAt(self.position, self.direction, glm.vec3(0, 1, 0))
 
+class Scene:
+    def __init__(self, app):
+        self.app = app
+        self.objects = []
+        self.load()
+        # skybox
+        self.skybox = AdvancedSkyBox(app)
+
+    def add_object(self, obj):
+        self.objects.append(obj)
+
+    def load(self):
+        app = self.app
+        add = self.add_object
+
+        # floor
+        n, s = 20, 2
+        for x in range(-n, n, s):
+            for z in range(-n, n, s):
+                add(Cube(app, pos=(x, -s, z)))
+
+        # columns
+        for i in range(9):
+            add(Cube(app, pos=(15, i * s, -9 + i), tex_id=2))
+            add(Cube(app, pos=(15, i * s, 5 - i), tex_id=2))
+
+        # moving cube
+        self.moving_cube = MovingCube(app, pos=(0, 6, 8), scale=(3, 3, 3), tex_id=1)
+        add(self.moving_cube)
+
+    def update(self):
+        self.moving_cube.rot.xyz = self.app.clock
+
+class ShaderProgram:
+    def __init__(self, ctx):
+        self.ctx = ctx
+        self.programs = {}
+        self.programs['default'] = self.get_program('default')
+        self.programs['skybox'] = self.get_program('skybox')
+        self.programs['advanced_skybox'] = self.get_program('advanced_skybox')
+        self.programs['shadow_map'] = self.get_program('shadow_map')
+
+    def get_program(self, shader_program_name):
+        with open(f'shaders/{shader_program_name}.vert') as file:
+            vertex_shader = file.read()
+
+        with open(f'shaders/{shader_program_name}.frag') as file:
+            fragment_shader = file.read()
+
+        program = self.ctx.program(vertex_shader=vertex_shader, fragment_shader=fragment_shader)
+        return program
+
+    def destroy(self):
+        [program.release() for program in self.programs.values()]
+
+class Texture:
+    def __init__(self, app):
+        self.app = app
+        self.ctx = app.ctx
+        self.textures = {}
+        self.textures[0] = self.get_texture(path='asset/images/img.png')
+        self.textures[1] = self.get_texture(path='asset/images/img_1.png')
+        self.textures[2] = self.get_texture(path='asset/images/img_2.png')
+        self.textures['skybox'] = self.get_texture_cube(dir_path='asset/skybox/', ext='png')
+        self.textures['depth_texture'] = self.get_depth_texture()
+
+    def get_depth_texture(self):
+        depth_texture = self.ctx.depth_texture(self.app.MIN_SIZE)
+        depth_texture.repeat_x = False
+        depth_texture.repeat_y = False
+        return depth_texture
+
+    def get_texture_cube(self, dir_path, ext='png'):
+        faces = ['right', 'left', 'top', 'bottom'] + ['front', 'back'][::-1]
+        textures = []
+        for face in faces:
+            texture = pg.image.load(dir_path + f'{face}.{ext}').convert()
+            if face in ['right', 'left', 'front', 'back']:
+                texture = pg.transform.flip(texture, flip_x=True, flip_y=False)
+            else:
+                texture = pg.transform.flip(texture, flip_x=False, flip_y=True)
+            textures.append(texture)
+
+        size = textures[0].get_size()
+        texture_cube = self.ctx.texture_cube(size=size, components=3, data=None)
+
+        for i in range(6):
+            texture_data = pg.image.tostring(textures[i], 'RGB')
+            texture_cube.write(face=i, data=texture_data)
+
+        return texture_cube
+
+    def get_texture(self, path):
+        texture = pg.image.load(path).convert()
+        texture = pg.transform.flip(texture, flip_x=False, flip_y=True)
+        texture = self.ctx.texture(size=texture.get_size(), components=3,
+                                   data=pg.image.tostring(texture, 'RGB'))
+        # mipmaps
+        texture.filter = (mgl.LINEAR_MIPMAP_LINEAR, mgl.LINEAR)
+        texture.build_mipmaps()
+        # AF
+        texture.anisotropy = 32.0
+        return texture
+
+    def destroy(self):
+        [tex.release() for tex in self.textures.values()]
+
+#VOs(vertex objects)
 
 class VAO:
     def __init__(self, ctx):
@@ -213,49 +332,6 @@ class VAO:
     def destroy(self):
         self.vbo.destroy()
         self.program.destroy()
-
-class Mesh:
-    def __init__(self, app):
-        self.app = app
-        self.vao = VAO(app.ctx)
-        self.texture = Texture(app)
-
-    def destroy(self):
-        self.vao.destroy()
-        self.texture.destroy()
-
-class Scene:
-    def __init__(self, app):
-        self.app = app
-        self.objects = []
-        self.load()
-        # skybox
-        self.skybox = AdvancedSkyBox(app)
-
-    def add_object(self, obj):
-        self.objects.append(obj)
-
-    def load(self):
-        app = self.app
-        add = self.add_object
-
-        # floor
-        n, s = 20, 2
-        for x in range(-n, n, s):
-            for z in range(-n, n, s):
-                add(Cube(app, pos=(x, -s, z)))
-
-        # columns
-        for i in range(9):
-            add(Cube(app, pos=(15, i * s, -9 + i), tex_id=2))
-            add(Cube(app, pos=(15, i * s, 5 - i), tex_id=2))
-
-        # moving cube
-        self.moving_cube = MovingCube(app, pos=(0, 6, 8), scale=(3, 3, 3), tex_id=1)
-        add(self.moving_cube)
-
-    def update(self):
-        self.moving_cube.rot.xyz = self.app.clock
 
 class VBO:
     def __init__(self, ctx):
@@ -367,79 +443,3 @@ class AdvancedSkyBoxVBO(BaseVBO):
         vertices = [(-1, -1, z), (3, -1, z), (-1, 3, z)]
         vertex_data = np.array(vertices, dtype='f4')
         return vertex_data
-
-
-class ShaderProgram:
-    def __init__(self, ctx):
-        self.ctx = ctx
-        self.programs = {}
-        self.programs['default'] = self.get_program('default')
-        self.programs['skybox'] = self.get_program('skybox')
-        self.programs['advanced_skybox'] = self.get_program('advanced_skybox')
-        self.programs['shadow_map'] = self.get_program('shadow_map')
-
-    def get_program(self, shader_program_name):
-        with open(f'shaders/{shader_program_name}.vert') as file:
-            vertex_shader = file.read()
-
-        with open(f'shaders/{shader_program_name}.frag') as file:
-            fragment_shader = file.read()
-
-        program = self.ctx.program(vertex_shader=vertex_shader, fragment_shader=fragment_shader)
-        return program
-
-    def destroy(self):
-        [program.release() for program in self.programs.values()]
-
-class Texture:
-    def __init__(self, app):
-        self.app = app
-        self.ctx = app.ctx
-        self.textures = {}
-        self.textures[0] = self.get_texture(path='asset/images/img.png')
-        self.textures[1] = self.get_texture(path='asset/images/img_1.png')
-        self.textures[2] = self.get_texture(path='asset/images/img_2.png')
-        self.textures['skybox'] = self.get_texture_cube(dir_path='asset/skybox/', ext='png')
-        self.textures['depth_texture'] = self.get_depth_texture()
-
-    def get_depth_texture(self):
-        depth_texture = self.ctx.depth_texture(self.app.MIN_SIZE)
-        depth_texture.repeat_x = False
-        depth_texture.repeat_y = False
-        return depth_texture
-
-    def get_texture_cube(self, dir_path, ext='png'):
-        faces = ['right', 'left', 'top', 'bottom'] + ['front', 'back'][::-1]
-        # textures = [pg.image.load(dir_path + f'{face}.{ext}').convert() for face in faces]
-        textures = []
-        for face in faces:
-            texture = pg.image.load(dir_path + f'{face}.{ext}').convert()
-            if face in ['right', 'left', 'front', 'back']:
-                texture = pg.transform.flip(texture, flip_x=True, flip_y=False)
-            else:
-                texture = pg.transform.flip(texture, flip_x=False, flip_y=True)
-            textures.append(texture)
-
-        size = textures[0].get_size()
-        texture_cube = self.ctx.texture_cube(size=size, components=3, data=None)
-
-        for i in range(6):
-            texture_data = pg.image.tostring(textures[i], 'RGB')
-            texture_cube.write(face=i, data=texture_data)
-
-        return texture_cube
-
-    def get_texture(self, path):
-        texture = pg.image.load(path).convert()
-        texture = pg.transform.flip(texture, flip_x=False, flip_y=True)
-        texture = self.ctx.texture(size=texture.get_size(), components=3,
-                                   data=pg.image.tostring(texture, 'RGB'))
-        # mipmaps
-        texture.filter = (mgl.LINEAR_MIPMAP_LINEAR, mgl.LINEAR)
-        texture.build_mipmaps()
-        # AF
-        texture.anisotropy = 32.0
-        return texture
-
-    def destroy(self):
-        [tex.release() for tex in self.textures.values()]
