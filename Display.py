@@ -16,6 +16,7 @@ class window:
     def __init__(self):
         try:
             print("Loading... Initializing")
+            pygame.mixer.pre_init(frequency=44100, size=16, buffer=8192)
             pygame.init()
             print("Loading... Getting Settings")
             if pygame.display.Info().current_h < self.MIN_SIZE[1] or pygame.display.Info().current_w < self.MIN_SIZE[0]:
@@ -41,9 +42,9 @@ class window:
 
             pygame.display.set_caption(self.game_name)
             if self.game_icon:
-                pygame.display.set_icon(pygame.image.load(self.game_icon))
+                pygame.display.set_icon(pygame.image.load(self.game_icon).convert_alpha())
             else:
-                pygame.display.set_icon(pygame.image.load("asset/game-icon.png"))
+                pygame.display.set_icon(pygame.image.load("asset/game-icon.png").convert_alpha())
             self.ctx = moderngl.create_context(require=330)
             self.ctx.enable(flags=mgl.DEPTH_TEST | mgl.CULL_FACE | mgl.BLEND)
             self.fps = self.init_settings["settings"]["fps"]
@@ -53,6 +54,8 @@ class window:
             self.scene = Scene(self)
             self.scene_renderer = SceneRenderer(self)
             self.dt = 0
+            self.fullscreen = False
+            pygame.event.set_allowed([pygame.QUIT, pygame.WINDOWFOCUSGAINED, pygame.WINDOWFOCUSLOST,pygame.VIDEORESIZE])
 
             print("COMPLETE")
             print(f"\nPython {sys.version.strip()}{platform.architecture()[0]}\n{platform.platform(terse=True)} {platform.architecture()[0]}")
@@ -69,7 +72,7 @@ class window:
     numba.njit()
     def run(self):
         focus = None
-        self.update(focus)  
+        self.update(focus) 
         while 1:
             self.update(focus) 
             for event in pygame.event.get():
@@ -88,33 +91,34 @@ class window:
                     focus = True
                 elif event.type == pygame.VIDEORESIZE:
                     self.resize(event)
+    
+    def resize(self,event):
+        if not self.fullscreen:
+            h=max(event.h,self.MIN_SIZE[0])
+            w=max(event.w,self.MIN_SIZE[1])
+            self.screen = pygame.display.set_mode((w,h), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE)
 
     numba.njit()            
     def event_handler(self):
         key_up = pygame.key.get_just_released()
         key_down = pygame.key.get_just_pressed()
         if key_up[pygame.K_0]:
-            print(f"\nDebug\nFPS: {math.ceil(pygame.time.Clock.get_fps(self.clock))}\nRefresh Rate: {pygame.display.get_current_refresh_rate()}")
+            print(f"\nDebug\nFPS: {math.ceil(pygame.time.Clock.get_fps(self.clock))}\nRefresh Rate: {pygame.display.get_current_refresh_rate()}\nFullscreen: {self.fullscreen}")
         if key_down[pygame.K_LSHIFT]:
             self.camera.SPEED = 0.03
         if key_up[pygame.K_LSHIFT]:
             self.camera.SPEED = 0.1
+        if key_up[pygame.K_ESCAPE]:
+            self.fullscreen = not self.fullscreen
+            pygame.display.toggle_fullscreen()
 
-            
-    def resize(self,event):
-        if pygame.key.get_just_released()[pygame.K_ESCAPE]:
-            pygame.time.wait(pygame.display.toggle_fullscreen())
-        else:
-            h = max(self.MIN_SIZE[1],event.h)
-            w = max(self.MIN_SIZE[0],event.w)
-            self.screen = pygame.display.set_mode((w,h), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE)
     numba.njit()
     def update(self,state):
         if state:
             self.event_handler()
             self.camera.update(self.fov)
             self.lastime = self.clock.get_time()
-            self.ctx.clear(color=(0.08, 0.16, 0.18))
+            self.ctx.clear()
             self.scene.update()
             self.scene_renderer.render()
             self.clock.tick(self.fps)
@@ -143,8 +147,6 @@ class window:
 
 class audioengine:
     def __init__(self, volume):
-        pygame.mixer.pre_init(frequency=44100, size=16, buffer=8192)
-        pygame.init()
         pygame.mixer.set_num_channels(32)
         self.volume = volume
 
