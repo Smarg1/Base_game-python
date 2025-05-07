@@ -1,33 +1,38 @@
 import os
 import platform
-import moderngl,glm
+import moderngl
+import glm
 import sys
 import math
-import numpy
 import json
-import numba
 from Models import *
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 
 class window:
+
     VERSION = "1.0.0"
     MIN_SIZE = (500, 500)
+
     def __init__(self):
         try:
+
             print("Loading... Initializing")
             pygame.mixer.pre_init(frequency=44100, size=16, buffer=8192)
             pygame.init()
             print("Loading... Getting Settings")
-            if pygame.display.Info().current_h < self.MIN_SIZE[1] or pygame.display.Info().current_w < self.MIN_SIZE[0]:
-                raise RuntimeError()
 
+            if pygame.display.Info().current_h < self.MIN_SIZE[1] or pygame.display.Info().current_w < self.MIN_SIZE[0]:
+                raise RuntimeError("Screen Size is too small")
+            
             pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, 3)
             pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, 3)
             pygame.display.gl_set_attribute(pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE)
+            pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS, 1)
+            pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLESAMPLES, 4)
 
             pygame.event.set_grab(True)
-            pygame.mouse.set_visible(False)
+            pygame.mouse.set_visible(True)
             self.init_settings = self.read_file("asset/settings.json")
             self.audio = audioengine(self.init_settings["settings"]["volume"])
             self.screen = pygame.display.set_mode(self.MIN_SIZE, pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE)
@@ -37,14 +42,14 @@ class window:
             print("Loading... Setting up")
             self.camera = Camera(self.fov,self)
             self.light = Light()
-            
             self.game_icon = self.init_settings["settings"]["game-icon"]
-
             pygame.display.set_caption(self.game_name)
+
             if self.game_icon:
                 pygame.display.set_icon(pygame.image.load(self.game_icon).convert_alpha())
             else:
                 pygame.display.set_icon(pygame.image.load("asset/game-icon.png").convert_alpha())
+
             self.ctx = moderngl.create_context(require=330)
             self.ctx.enable(flags=mgl.DEPTH_TEST | mgl.CULL_FACE | mgl.BLEND)
             self.fps = self.init_settings["settings"]["fps"]
@@ -65,11 +70,10 @@ class window:
             print(f"GL DRIVER: {self.ctx.info['GL_VERSION']}\nEngine Version: {self.VERSION}")
             self.run()
 
-        except (SystemError, OSError, RuntimeError, ChildProcessError) as e:
+        except Exception as e:
             print(e)
             sys.exit("\nExit Code: \n1\n")
 
-    numba.njit()
     def run(self):
         focus = None
         self.update(focus) 
@@ -92,13 +96,13 @@ class window:
                 elif event.type == pygame.VIDEORESIZE:
                     self.resize(event)
     
-    def resize(self,event):
+    def resize(self, event):
+        h = max(event.h, self.MIN_SIZE[0])
+        w = max(event.w, self.MIN_SIZE[1])
         if not self.fullscreen:
-            h=max(event.h,self.MIN_SIZE[0])
-            w=max(event.w,self.MIN_SIZE[1])
             self.screen = pygame.display.set_mode((w,h), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE)
+        self.ctx.viewport = (0, 0, w, h)
 
-    numba.njit()            
     def event_handler(self):
         key_up = pygame.key.get_just_released()
         key_down = pygame.key.get_just_pressed()
@@ -112,7 +116,6 @@ class window:
             self.fullscreen = not self.fullscreen
             pygame.display.toggle_fullscreen()
 
-    numba.njit()
     def update(self,state):
         if state:
             self.event_handler()
@@ -181,7 +184,7 @@ class Camera:
     def __init__(self, fov, app, position=(0, 0, 0), yaw=-90, pitch=0):
         self.fov = fov
         self.app = app
-        self.aspect_ratio = pygame.display.get_surface().get_width()/pygame.display.get_surface().get_height()
+        self.aspect_ratio = 16/9
         self.position = glm.vec3(position)
         self.up = glm.vec3(0, 1, 0)
         self.right = glm.vec3(1, 0, 0)
@@ -210,7 +213,7 @@ class Camera:
         self.up = glm.normalize(glm.cross(self.right, self.forward))
 
     def update(self,fov):
-        self.aspect_ratio = pygame.display.get_surface().get_width()/pygame.display.get_surface().get_height()
+        self.aspect_ratio = 16/9
         self.fov = fov
         self.move()
         self.rotate()
